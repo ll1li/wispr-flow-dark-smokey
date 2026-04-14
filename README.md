@@ -19,18 +19,17 @@ Wispr Flow ships with a hardcoded white UI and no dark mode option. This script 
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ll1li/wispr-flow-dark-mode/main/wispr-dark-mode -o /usr/local/bin/wispr-dark-mode
-chmod +x /usr/local/bin/wispr-dark-mode
+curl -fsSL https://raw.githubusercontent.com/ll1li/wispr-flow-dark-mode/main/wispr-dark-mode \
+  -o ~/.local/bin/wispr-dark-mode && chmod +x ~/.local/bin/wispr-dark-mode
 ```
+
+Make sure `~/.local/bin` is in your `PATH`. Alternatively, use `/usr/local/bin/` (may require `sudo`).
 
 ## Usage
 
 ```bash
-# Apply dark mode
+# Apply dark mode (auto-restarts Wispr Flow)
 wispr-dark-mode
-
-# Restart Wispr Flow
-killall 'Wispr Flow' && open -a 'Wispr Flow'
 
 # Restore original
 wispr-dark-mode --restore

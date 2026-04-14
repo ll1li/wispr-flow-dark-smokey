@@ -2,15 +2,8 @@
 set -euo pipefail
 
 # Wispr Flow Dark Mode Patcher
-# Patches the Electron app bundle to force dark mode on all UI windows.
+# Injects a dark theme into Wispr Flow's Electron renderer HTML.
 # Re-run after any Wispr Flow update.
-#
-# How it works:
-#   Wispr Flow's hub window has background-color: white hardcoded in the HTML.
-#   The React app has no dark mode toggle. This script injects a CSS
-#   filter: invert(0.9) hue-rotate(180deg) into the renderer HTML files,
-#   flipping the entire UI to dark. Images are counter-inverted so they
-#   render normally.
 #
 # Requirements: Node.js (for npx asar)
 # Usage: wispr-dark-mode [--restore]
@@ -20,33 +13,27 @@ BACKUP="${ASAR}.bak"
 
 if [ ! -f "$ASAR" ]; then
   echo "Error: Wispr Flow not found at $ASAR"
-  echo "Expected: /Applications/Wispr Flow.app"
   exit 1
 fi
 
-# Restore mode
 if [ "${1:-}" = "--restore" ]; then
   if [ -f "$BACKUP" ]; then
     cp "$BACKUP" "$ASAR"
-    echo "Restored original Wispr Flow. Restart the app to apply."
+    echo "Restored original. Restarting Wispr Flow..."
+    killall 'Wispr Flow' 2>/dev/null || true
+    sleep 1
+    open -a 'Wispr Flow'
   else
     echo "No backup found at $BACKUP"
   fi
   exit 0
 fi
 
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' EXIT
 
-echo "==> Backing up app.asar..."
-cp "$ASAR" "$BACKUP"
-
-echo "==> Extracting app bundle..."
-npx --yes asar extract "$ASAR" "$TMPDIR/wispr" 2>/dev/null
-
-echo "==> Patching hub window..."
-cat > "$TMPDIR/wispr/.webpack/renderer/hub/index.html" << 'HTMLEOF'
-<!doctype html><html style="height: 100%; width: 100%"><head><meta charset="UTF-8"/><style>
+# Shared CSS for both hub and scratchpad
+DARK_CSS='
 html {
   background: #1a1a1a !important;
   filter: invert(0.94) hue-rotate(180deg) !important;
@@ -54,55 +41,53 @@ html {
 img, video, canvas, svg image, picture {
   filter: invert(1) hue-rotate(180deg) !important;
 }
-/* Override Wispr color variables — force all light shades to same white */
 :root {
-  --sand-50: #ffffff !important;
-  --sand-100: #ffffff !important;
-  --sand-200: #ffffff !important;
-  --sand-300: #ffffff !important;
-  --sand-400: #ffffff !important;
-  --sand-500: #ffffff !important;
-  --vast-50: #ffffff !important;
-  --vast-100: #ffffff !important;
-  --neutral-10: #ffffff !important;
+  --sand-50: #fff !important; --sand-100: #fff !important;
+  --sand-200: #fff !important; --sand-300: #fff !important;
+  --sand-400: #fff !important; --sand-500: #fff !important;
+  --vast-50: #fff !important; --vast-100: #fff !important;
+  --neutral-10: #fff !important;
 }
-/* Dim text — not pure white */
 * {
   border-color: transparent !important;
   outline-color: transparent !important;
   box-shadow: none !important;
 }
 body { opacity: 0.92; filter: sepia(0.08); }
-/* Thin clean outlines on interactive elements */
 button, a[href], [role="button"], [role="tab"],
 nav a, nav button, li > a, li > button {
-  border: 1px solid rgba(128, 128, 128, 0.18) !important;
+  border: 1px solid rgba(128,128,128,0.18) !important;
   border-radius: 8px;
 }
-/* Scrollbar */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.15); border-radius: 3px; }
-</style><script defer="defer" src="../vendor/index.js"></script><script defer="defer" src="../hub/index.js"></script></head><body style="background-color: #1a1a1a; height: 100%; width: 100%; overflow: hidden"></body></html>
+'
+
+echo "==> Backing up app.asar..."
+cp "$ASAR" "$BACKUP"
+
+echo "==> Extracting..."
+npx --yes asar extract "$ASAR" "$WORKDIR/wispr" 2>/dev/null
+
+echo "==> Patching hub..."
+cat > "$WORKDIR/wispr/.webpack/renderer/hub/index.html" << HTMLEOF
+<!doctype html><html style="height:100%;width:100%"><head><meta charset="UTF-8"/><style>${DARK_CSS}</style><script defer="defer" src="../vendor/index.js"></script><script defer="defer" src="../hub/index.js"></script></head><body style="background:#1a1a1a;height:100%;width:100%;overflow:hidden"></body></html>
 HTMLEOF
 
-echo "==> Patching scratchpad window..."
-cat > "$TMPDIR/wispr/.webpack/renderer/scratchpad/index.html" << 'HTMLEOF'
-<!doctype html><html><head><meta charset="UTF-8"/><style>
-html { background: #1a1a1a !important; filter: invert(0.94) hue-rotate(180deg) !important; }
-img, video, canvas, svg image { filter: invert(1) hue-rotate(180deg) !important; }
-* { border-color: transparent !important; outline-color: transparent !important; box-shadow: none !important; }
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.15); border-radius: 3px; }
-</style><script defer="defer" src="../vendor/index.js"></script><script defer="defer" src="../scratchpad/index.js"></script></head><body style="overflow: hidden; background-color: #1a1a1a;"></body></html>
+echo "==> Patching scratchpad..."
+cat > "$WORKDIR/wispr/.webpack/renderer/scratchpad/index.html" << HTMLEOF
+<!doctype html><html><head><meta charset="UTF-8"/><style>${DARK_CSS}</style><script defer="defer" src="../vendor/index.js"></script><script defer="defer" src="../scratchpad/index.js"></script></head><body style="overflow:hidden;background:#1a1a1a"></body></html>
 HTMLEOF
 
-echo "==> Repacking app bundle..."
-npx --yes asar pack "$TMPDIR/wispr" "$ASAR" 2>/dev/null
+echo "==> Repacking..."
+npx --yes asar pack "$WORKDIR/wispr" "$ASAR" 2>/dev/null
+
+echo "==> Restarting Wispr Flow..."
+killall 'Wispr Flow' 2>/dev/null || true
+sleep 1
+open -a 'Wispr Flow'
 
 echo ""
-echo "Done! Restart Wispr Flow to apply:"
-echo "  killall 'Wispr Flow' && open -a 'Wispr Flow'"
-echo ""
-echo "To restore the original: wispr-dark-mode --restore"
+echo "Done! Dark mode applied."
+echo "To restore: wispr-dark-mode --restore"
