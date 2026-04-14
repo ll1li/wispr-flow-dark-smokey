@@ -1,15 +1,15 @@
 <h1 align="center">
-  Wispr Flow Dark Smoky
+  Wispr Flow Dark Smokey
 </h1>
 
 <h4 align="center">A one-command dark theme for <a href="https://wispr.com/" target="_blank">Wispr Flow</a> on macOS.</h4>
 
 <p align="center">
-  <a href="https://github.com/ll1li/wispr-flow-dark-smoky/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/ll1li/wispr-flow-dark-smoky?style=flat-square" alt="License">
+  <a href="https://github.com/ll1li/wispr-flow-dark-smokey/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/ll1li/wispr-flow-dark-smokey?style=flat-square" alt="License">
   </a>
-  <a href="https://github.com/ll1li/wispr-flow-dark-smoky/releases">
-    <img src="https://img.shields.io/github/v/release/ll1li/wispr-flow-dark-smoky?style=flat-square&label=version" alt="Version">
+  <a href="https://github.com/ll1li/wispr-flow-dark-smokey/releases">
+    <img src="https://img.shields.io/github/v/release/ll1li/wispr-flow-dark-smokey?style=flat-square&label=version" alt="Version">
   </a>
   <img src="https://img.shields.io/badge/platform-macOS-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/requires-Node.js-green?style=flat-square" alt="Requires Node.js">
@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="screenshot.png" alt="Wispr Flow Dark Smoky" width="700">
+  <img src="screenshot.png" alt="Wispr Flow Dark Smokey" width="700">
 </p>
 
 ---
@@ -42,7 +42,7 @@ Wispr Flow ships with a hardcoded white UI and no dark mode option. This script 
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smoky/main/wispr-dark-mode \
+curl -fsSL https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smokey/main/wispr-dark-mode \
   -o ~/.local/bin/wispr-dark-mode && chmod +x ~/.local/bin/wispr-dark-mode
 ```
 
