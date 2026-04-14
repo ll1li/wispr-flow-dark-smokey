@@ -1,8 +1,8 @@
-# Wispr Flow Dark Mode
+# Wispr Flow Dark Smoky
 
-A one-command dark mode patch for [Wispr Flow](https://wispr.com/) on macOS.
+A one-command dark theme for [Wispr Flow](https://wispr.com/) on macOS.
 
-![Wispr Flow Dark Mode](screenshot.png)
+![Wispr Flow Dark Smoky](screenshot.png)
 
 Wispr Flow ships with a hardcoded white UI and no dark mode option. This script patches the Electron app bundle to inject a carefully tuned dark theme with warm tones, uniform backgrounds, and clean outlines.
 
@@ -19,7 +19,7 @@ Wispr Flow ships with a hardcoded white UI and no dark mode option. This script 
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ll1li/wispr-flow-dark-mode/main/wispr-dark-mode \
+curl -fsSL https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smoky/main/wispr-dark-mode \
   -o ~/.local/bin/wispr-dark-mode && chmod +x ~/.local/bin/wispr-dark-mode
 ```
 
