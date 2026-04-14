@@ -64,8 +64,13 @@ nav a, nav button, li > a, li > button {
 ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.15); border-radius: 3px; }
 '
 
-echo "==> Backing up app.asar..."
-cp "$ASAR" "$BACKUP"
+# Only backup if no backup exists (prevents overwriting original with patched version)
+if [ ! -f "$BACKUP" ]; then
+  echo "==> Backing up app.asar..."
+  cp "$ASAR" "$BACKUP"
+else
+  echo "==> Backup already exists, keeping original."
+fi
 
 echo "==> Extracting..."
 npx --yes asar extract "$ASAR" "$WORKDIR/wispr" 2>/dev/null
