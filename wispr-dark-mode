@@ -1,24 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Wispr Flow Dark Mode Patcher
-# Injects a dark theme into Wispr Flow's Electron renderer HTML.
+# Wispr Flow Dark Smokey
+# Injects a warm dark theme into Wispr Flow's Electron renderer HTML.
 # Re-run after any Wispr Flow update.
 #
-# Requirements: Node.js (for npx asar)
+# Requirements: macOS, Node.js (for npx asar), internet (first run)
 # Usage: wispr-dark-mode [--restore]
 
 ASAR="/Applications/Wispr Flow.app/Contents/Resources/app.asar"
 BACKUP="${ASAR}.bak"
+
+# Renderer HTML paths inside the extracted asar bundle
+# (discovered via: npx asar extract app.asar /tmp/wispr && find /tmp/wispr -name index.html)
+RENDERERS=(hub scratchpad contextMenu status)
+
+# Preflight checks
+for cmd in npx killall open; do
+  command -v "$cmd" >/dev/null 2>&1 || { echo "Error: required command '$cmd' not found."; exit 1; }
+done
 
 if [ ! -f "$ASAR" ]; then
   echo "Error: Wispr Flow not found at $ASAR"
   exit 1
 fi
 
+# Restore mode
 if [ "${1:-}" = "--restore" ]; then
   if [ -f "$BACKUP" ]; then
-    cp "$BACKUP" "$ASAR"
+    if ! cp "$BACKUP" "$ASAR"; then
+      echo "Error: could not restore — try running with sudo."
+      exit 1
+    fi
     echo "Restored original. Restarting Wispr Flow..."
     killall 'Wispr Flow' 2>/dev/null || true
     sleep 1
@@ -32,7 +45,7 @@ fi
 WORKDIR=$(mktemp -d)
 trap 'rm -rf "$WORKDIR"' EXIT
 
-# Shared CSS for both hub and scratchpad
+# Shared CSS for hub, scratchpad, and context menu
 DARK_CSS='
 html {
   background: #1a1a1a !important;
@@ -64,7 +77,7 @@ nav a, nav button, li > a, li > button {
 ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.15); border-radius: 3px; }
 '
 
-# Only backup if no backup exists (prevents overwriting original with patched version)
+# Only backup on first run (prevents overwriting original with patched version)
 if [ ! -f "$BACKUP" ]; then
   echo "==> Backing up app.asar..."
   cp "$ASAR" "$BACKUP"
@@ -72,8 +85,23 @@ else
   echo "==> Backup already exists, keeping original."
 fi
 
+# Always extract from the original backup for a clean baseline
+SOURCE="$ASAR"
+if [ -f "$BACKUP" ]; then
+  SOURCE="$BACKUP"
+fi
+
 echo "==> Extracting..."
-npx --yes asar extract "$ASAR" "$WORKDIR/wispr" 2>/dev/null
+npx --yes asar extract "$SOURCE" "$WORKDIR/wispr"
+
+# Verify expected renderer paths exist
+for renderer in "${RENDERERS[@]}"; do
+  target="$WORKDIR/wispr/.webpack/renderer/$renderer/index.html"
+  if [ ! -f "$target" ]; then
+    echo "Error: $renderer renderer not found — Wispr Flow may have updated its structure."
+    exit 1
+  fi
+done
 
 echo "==> Patching hub..."
 cat > "$WORKDIR/wispr/.webpack/renderer/hub/index.html" << HTMLEOF
@@ -90,6 +118,7 @@ cat > "$WORKDIR/wispr/.webpack/renderer/contextMenu/index.html" << HTMLEOF
 <!doctype html><html><head><meta charset="UTF-8"/><title>Context Menu</title><style>body{margin:0;padding:0;background:transparent;overflow:hidden}${DARK_CSS}</style><script defer="defer" src="../vendor/index.js"></script><script defer="defer" src="../contextMenu/index.js"></script></head><body><div id="root"></div></body></html>
 HTMLEOF
 
+# Status bar: no invert — it's already dark/transparent natively
 echo "==> Patching status bar..."
 cat > "$WORKDIR/wispr/.webpack/renderer/status/index.html" << 'HTMLEOF'
 <!doctype html><html><head><meta charset="UTF-8"/><style>
@@ -98,12 +127,17 @@ html, body { background: transparent !important; }
 </style><script defer="defer" src="../vendor/index.js"></script><script defer="defer" src="../status/index.js"></script></head><body style="overflow:hidden"></body></html>
 HTMLEOF
 
+# Pack to temp file first, then copy into place (safe against partial writes)
 echo "==> Repacking..."
-npx --yes asar pack "$WORKDIR/wispr" "$ASAR" 2>/dev/null
+npx --yes asar pack "$WORKDIR/wispr" "$WORKDIR/patched.asar"
+cp "$WORKDIR/patched.asar" "$ASAR"
 
 echo "==> Restarting Wispr Flow..."
 killall 'Wispr Flow' 2>/dev/null || true
-sleep 1
+for _ in 1 2 3 4 5; do
+  pgrep -x 'Wispr Flow' > /dev/null || break
+  sleep 1
+done
 open -a 'Wispr Flow'
 
 echo ""

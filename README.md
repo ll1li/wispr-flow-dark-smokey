@@ -8,9 +8,7 @@
   <a href="https://github.com/ll1li/wispr-flow-dark-smokey/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/ll1li/wispr-flow-dark-smokey?style=flat-square" alt="License">
   </a>
-  <a href="https://github.com/ll1li/wispr-flow-dark-smokey/releases">
-    <img src="https://img.shields.io/github/v/release/ll1li/wispr-flow-dark-smokey?style=flat-square&label=version" alt="Version">
-  </a>
+  <img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square" alt="Version">
   <img src="https://img.shields.io/badge/platform-macOS-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/requires-Node.js-green?style=flat-square" alt="Requires Node.js">
 </p>
@@ -23,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="screenshot.png" alt="Wispr Flow Dark Smokey" width="700">
+  <img src="screenshot.jpg" alt="Wispr Flow Dark Smokey" width="700">
 </p>
 
 ---
@@ -42,11 +40,13 @@ Wispr Flow ships with a hardcoded white UI and no dark mode option. This script 
 ## Install
 
 ```bash
+mkdir -p ~/.local/bin
 curl -fsSL https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smokey/main/wispr-dark-mode \
   -o ~/.local/bin/wispr-dark-mode && chmod +x ~/.local/bin/wispr-dark-mode
 ```
 
-> Make sure `~/.local/bin` is in your `PATH`. Alternatively, use `/usr/local/bin/` (may require `sudo`).
+> Make sure `~/.local/bin` is in your `PATH` (`export PATH="$HOME/.local/bin:$PATH"`).
+> Alternatively, use `/usr/local/bin/` (may require `sudo`).
 
 ## Usage
 
@@ -58,7 +58,7 @@ wispr-dark-mode
 wispr-dark-mode --restore
 ```
 
-Re-run after Wispr Flow updates -- the update will overwrite the patch.
+> **Note:** Wispr Flow auto-updates will overwrite the patch. Just re-run `wispr-dark-mode` after any update.
 
 ## How It Works
 
