@@ -49,19 +49,52 @@ cat > "$TMPDIR/wispr/.webpack/renderer/hub/index.html" << 'HTMLEOF'
 <!doctype html><html style="height: 100%; width: 100%"><head><meta charset="UTF-8"/><style>
 html {
   background: #1a1a1a !important;
-  filter: invert(0.9) hue-rotate(180deg) !important;
+  filter: invert(0.94) hue-rotate(180deg) !important;
 }
 img, video, canvas, svg image, picture {
   filter: invert(1) hue-rotate(180deg) !important;
 }
+/* Override Wispr color variables — force all light shades to same white */
+:root {
+  --sand-50: #ffffff !important;
+  --sand-100: #ffffff !important;
+  --sand-200: #ffffff !important;
+  --sand-300: #ffffff !important;
+  --sand-400: #ffffff !important;
+  --sand-500: #ffffff !important;
+  --vast-50: #ffffff !important;
+  --vast-100: #ffffff !important;
+  --neutral-10: #ffffff !important;
+}
+/* Dim text — not pure white */
+* {
+  border-color: transparent !important;
+  outline-color: transparent !important;
+  box-shadow: none !important;
+}
+body { opacity: 0.92; filter: sepia(0.08); }
+/* Thin clean outlines on interactive elements */
+button, a[href], [role="button"], [role="tab"],
+nav a, nav button, li > a, li > button {
+  border: 1px solid rgba(128, 128, 128, 0.18) !important;
+  border-radius: 8px;
+}
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.15); border-radius: 3px; }
 </style><script defer="defer" src="../vendor/index.js"></script><script defer="defer" src="../hub/index.js"></script></head><body style="background-color: #1a1a1a; height: 100%; width: 100%; overflow: hidden"></body></html>
 HTMLEOF
 
 echo "==> Patching scratchpad window..."
 cat > "$TMPDIR/wispr/.webpack/renderer/scratchpad/index.html" << 'HTMLEOF'
 <!doctype html><html><head><meta charset="UTF-8"/><style>
-html { background: #1a1a1a !important; filter: invert(0.9) hue-rotate(180deg) !important; }
+html { background: #1a1a1a !important; filter: invert(0.94) hue-rotate(180deg) !important; }
 img, video, canvas, svg image { filter: invert(1) hue-rotate(180deg) !important; }
+* { border-color: transparent !important; outline-color: transparent !important; box-shadow: none !important; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.15); border-radius: 3px; }
 </style><script defer="defer" src="../vendor/index.js"></script><script defer="defer" src="../scratchpad/index.js"></script></head><body style="overflow: hidden; background-color: #1a1a1a;"></body></html>
 HTMLEOF
 
