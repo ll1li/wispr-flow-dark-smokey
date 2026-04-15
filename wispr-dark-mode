@@ -5,6 +5,7 @@ VERSION="1.1.0"
 ASAR="${WISPR_PATH:-/Applications/Wispr Flow.app}/Contents/Resources/app.asar"
 BACKUP="${ASAR}.bak"
 ASAR_WRITTEN=0
+TMPFILE=""
 MARKER="data-wispr-dark-smokey"
 
 # Pinned version — no supply chain surprise
@@ -33,6 +34,7 @@ command -v npx &>/dev/null    || { echo "Error: Node.js required (npx not found)
 WORKDIR=$(mktemp -d)
 cleanup() {
   rm -rf "$WORKDIR"
+  [[ -n "$TMPFILE" ]] && rm -f "$TMPFILE"
   if [[ "$ASAR_WRITTEN" == "1" ]]; then
     killall 'Wispr Flow' 2>/dev/null || true
     for _ in 1 2 3 4 5; do pgrep -x 'Wispr Flow' >/dev/null || break; sleep 1; done
@@ -101,7 +103,7 @@ fi
 # Pack to temp on same filesystem, then atomic rename
 echo "==> Repacking..."
 npx --yes "$ASAR_CMD" pack "$WORKDIR/wispr" "$WORKDIR/patched.asar"
-TMPFILE="$(dirname "$ASAR")/.app.asar.tmp.$$"
+TMPFILE=$(mktemp "$(dirname "$ASAR")/.app.asar.tmp.XXXXXXXXXX")
 cp "$WORKDIR/patched.asar" "$TMPFILE"
 mv "$TMPFILE" "$ASAR"
 ASAR_WRITTEN=1
