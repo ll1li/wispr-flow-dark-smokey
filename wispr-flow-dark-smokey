@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="1.3.0"
+ASAR="${WISPR_PATH:-/Applications/Wispr Flow.app}/Contents/Resources/app.asar"
+UNPACKED="${ASAR}.unpacked"
+BACKUP="${ASAR}.bak"
+BACKUP_UNPACKED="${BACKUP}.unpacked"
+ASAR_WRITTEN=0
+TMPFILE=""
+MARKER="data-wispr-dark-smokey"
+
+# Pinned version — no supply chain surprise
+ASAR_CMD="@electron/asar@4.2.0"
+
+# Track whether the app was running before we kill it
+APP_WAS_RUNNING=0
+pgrep -x 'Wispr Flow' >/dev/null && APP_WAS_RUNNING=1 || true
+
+usage() {
+  echo "wispr-flow-dark-smokey $VERSION — dark theme for Wispr Flow"
+  echo ""
+  echo "Usage: wispr-flow-dark-smokey [--restore|--check|--version|--help]"
+  echo ""
+  echo "  (no args)    Apply dark theme"
+  echo "  --restore    Restore original Wispr Flow"
+  echo "  --check      Check if theme is currently applied"
+  echo "  --version    Print version"
+  echo "  --help       Show this help"
+  echo ""
+  echo "Set WISPR_PATH to override the default install location."
+  exit 0
+}
+
+[[ "${1:-}" == "--help" ]]    && usage
+[[ "${1:-}" == "--version" ]] && echo "wispr-flow-dark-smokey $VERSION" && exit 0
+[[ -f "$ASAR" ]]              || { echo "Error: Wispr Flow not found at $ASAR"; exit 1; }
+command -v npx &>/dev/null    || { echo "Error: Node.js required (npx not found). Install: https://nodejs.org"; exit 1; }
+
+WORKDIR=$(mktemp -d)
+cleanup() {
+  rm -rf "$WORKDIR"
+  [[ -n "$TMPFILE" && -f "$TMPFILE" ]] && rm -f "$TMPFILE"
+  if [[ "$ASAR_WRITTEN" == "1" ]]; then
+    killall 'Wispr Flow' 2>/dev/null || true
+    for _ in 1 2 3 4 5; do pgrep -f 'Wispr Flow' >/dev/null || break; sleep 1; done
+    open -a 'Wispr Flow' 2>/dev/null || true
+  elif [[ "$APP_WAS_RUNNING" == "1" ]]; then
+    # Script failed after killing the app — restart so user isn't left with nothing
+    open -a 'Wispr Flow' 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
+
+# --check: detect if theme is applied
+if [[ "${1:-}" == "--check" ]]; then
+  npx --yes "$ASAR_CMD" extract "$ASAR" "$WORKDIR/wispr" 2>/dev/null
+  if grep -q "$MARKER" "$WORKDIR/wispr/.webpack/renderer/hub/index.html" 2>/dev/null; then
+    echo "Dark Smokey is applied."
+  else
+    echo "Dark Smokey is not applied."
+  fi
+  exit 0
+fi
+
+# Kill Wispr BEFORE touching anything
+if [[ "$APP_WAS_RUNNING" == "1" ]]; then
+  killall 'Wispr Flow' 2>/dev/null || true
+  for _ in 1 2 3 4 5; do pgrep -f 'Wispr Flow' >/dev/null || break; sleep 1; done
+fi
+
+# --restore
+if [[ "${1:-}" == "--restore" ]]; then
+  [[ -f "$BACKUP" ]] || { echo "No backup found."; exit 1; }
+  mv "$BACKUP" "$ASAR"
+  if [[ -d "$BACKUP_UNPACKED" ]]; then
+    UNPACKED_TMP="${UNPACKED}.restoring.$$"
+    mv "$UNPACKED" "$UNPACKED_TMP" 2>/dev/null || true
+    if mv "$BACKUP_UNPACKED" "$UNPACKED"; then
+      rm -rf "$UNPACKED_TMP"
+    else
+      mv "$UNPACKED_TMP" "$UNPACKED" 2>/dev/null || true
+      echo "Error: failed to restore $UNPACKED — original left intact."
+      exit 1
+    fi
+  fi
+  ASAR_WRITTEN=1
+  echo "Restored. Wispr Flow will restart."
+  exit 0
+fi
+
+# Backup (first run only) — must include .unpacked dir for native binaries
+if [[ ! -f "$BACKUP" ]]; then
+  cp "$ASAR" "$BACKUP"
+  if [[ -d "$UNPACKED" ]]; then
+    cp -R "$UNPACKED" "$BACKUP_UNPACKED"
+  fi
+fi
+
+# Always extract from clean backup
+echo "==> Extracting..."
+npx --yes "$ASAR_CMD" extract "$BACKUP" "$WORKDIR/wispr"
+
+# Theme CSS — injected before </head>, preserving all original content
+#
+# Strategy: filter:invert on <html> flips the entire rendered UI to dark.
+# Everything below compensates for side-effects of that inversion:
+#
+#   1. invert(0.90)          — high invert for deep dark, avoids pure-black
+#   2. hue-rotate(180deg)    — restores hue relationships after inversion
+#   3. sepia(0.10)           — subtle warmth, not noisy
+#   4. brightness(0.98)      — minimal pullback to stay dark
+#   5. body::before smoke    — slow-drifting radial gradients (55s cycle)
+#   6. --sand-* / --vast-*   — graduated near-white values so inversion
+#                              produces natural depth variation
+#   7. img/video/canvas      — counter-invert to restore natural media colours
+#   8. Overlay hashed classes — these change on app updates; see OVERLAY NOTE below
+#
+# OVERLAY NOTE: The hashed classes (.mgB3HwW13t29DKsEkfUD etc.) target specific
+# modal overlay elements. They break when Wispr Flow updates its CSS Modules hash.
+# To find new hashes after an update, extract the asar and run:
+#   grep -r "position:fixed;inset:0;background-color:rgba" .webpack/renderer/
+# then update the three class selectors below and re-run this script.
+#
+DARK_CSS='<style data-wispr-dark-smokey>html{background:#141211!important;filter:invert(.90) hue-rotate(180deg) sepia(.10) brightness(.98)!important;-webkit-font-smoothing:antialiased!important}body{background:#141211!important}body::before{content:""!important;position:fixed!important;top:-10%!important;left:-10%!important;width:120%!important;height:120%!important;z-index:0!important;pointer-events:none!important;background:radial-gradient(ellipse 600px 400px at 30% 40%,rgba(200,190,180,.06),transparent 70%),radial-gradient(ellipse 500px 600px at 70% 60%,rgba(190,180,170,.05),transparent 70%),radial-gradient(ellipse 700px 350px at 50% 80%,rgba(195,185,175,.04),transparent 70%)!important;animation:wispr-smoke 55s ease-in-out infinite alternate!important}@keyframes wispr-smoke{0%{transform:translate(0,0) scale(1);opacity:.6}33%{transform:translate(30px,-25px) scale(1.06);opacity:.85}66%{transform:translate(-20px,15px) scale(.96);opacity:.7}100%{transform:translate(10px,-10px) scale(1.02);opacity:.8}}img,video,canvas,svg image,picture>img{filter:invert(1) hue-rotate(180deg)!important}:root{--sand-50:#fff!important;--sand-100:#fefefe!important;--sand-200:#fdfdfc!important;--sand-300:#fcfcfb!important;--sand-400:#fbfbfa!important;--sand-500:#fafaf9!important;--vast-50:#fefefe!important;--vast-100:#fdfdfc!important;--neutral-10:#fff!important}.mgB3HwW13t29DKsEkfUD,.Lo3Dvv9YLP6w7ogTpGvR{background-color:rgba(255,255,255,.3)!important}.h4ZXMTnO1FZBj82_Jjao{background-color:rgba(255,255,255,.82)!important}*:focus-visible{outline:2px solid rgba(100,149,237,.7)!important;outline-offset:2px!important}::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(128,128,128,.2);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:rgba(128,128,128,.5)}::-webkit-scrollbar-thumb:active{background:rgba(128,128,128,.7)}::selection{background:rgba(180,140,100,.35)!important;color:inherit!important}</style>'
+
+STATUS_CSS='<style data-wispr-dark-smokey>html,body{background:transparent!important}*{border-color:transparent!important;box-shadow:none!important}</style>'
+
+# Inject into existing HTML — preserves all original script tags and content
+# Strip any previous patch first, then inject fresh CSS
+for renderer in hub scratchpad contextMenu; do
+  target="$WORKDIR/wispr/.webpack/renderer/$renderer/index.html"
+  [[ -f "$target" ]] || { echo "Error: $renderer not found — Wispr Flow may have updated its structure."; exit 1; }
+
+  if grep -q "$MARKER" "$target"; then
+    echo "==> Stripping old patch from $renderer..."
+    sed -i '' "s|<style ${MARKER}>.*</style>||g" "$target"
+  fi
+
+  echo "==> Patching $renderer..."
+  sed -i '' "s|</head>|${DARK_CSS}</head>|" "$target"
+  grep -q "$MARKER" "$target" || {
+    echo "Error: failed to inject CSS into $renderer — </head> not found in $target"
+    exit 1
+  }
+done
+
+# Status bar: no invert — already dark/transparent natively
+target="$WORKDIR/wispr/.webpack/renderer/status/index.html"
+if [[ -f "$target" ]]; then
+  if grep -q "$MARKER" "$target"; then
+    sed -i '' "s|<style ${MARKER}>.*</style>||g" "$target"
+  fi
+  echo "==> Patching status..."
+  sed -i '' "s|</head>|${STATUS_CSS}</head>|" "$target"
+  grep -q "$MARKER" "$target" || {
+    echo "Error: failed to inject CSS into status — </head> not found in $target"
+    exit 1
+  }
+fi
+
+# Pack to temp on same filesystem, then atomic rename
+echo "==> Repacking..."
+npx --yes "$ASAR_CMD" pack "$WORKDIR/wispr" "$WORKDIR/patched.asar"
+TMPFILE=$(mktemp "$(dirname "$ASAR")/.app.asar.tmp.XXXXXXXXXX")
+cp "$WORKDIR/patched.asar" "$TMPFILE"
+mv "$TMPFILE" "$ASAR"
+TMPFILE=""  # mv consumed it; prevent cleanup from attempting rm
+ASAR_WRITTEN=1
+
+echo "Done. Wispr Flow Dark-Smokey applied."
