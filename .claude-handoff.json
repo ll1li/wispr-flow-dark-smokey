@@ -1,0 +1,64 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-04-16T01:30:00Z",
+  "repo": "wispr-flow-dark-mode",
+  "branch": "main",
+  "git_state": {
+    "uncommitted_files": [
+      "A  CLAUDE.md",
+      "M  README.md",
+      "RM wispr-dark-mode -> wispr-flow-dark-smokey",
+      "?? .claude/",
+      "?? Dark-Reader-Settings.json",
+      "?? DarkReader-manual-raycast-com.css",
+      "?? preload.js",
+      "?? skills-lock.json"
+    ],
+    "last_commit_hash": "637aa7c",
+    "last_commit_message": "Merge pull request #2 from ll1li/jules-2927735487725223208-fdeccb99"
+  },
+  "planning_files": {
+    "task_plan": "missing",
+    "progress": "missing",
+    "findings": "missing"
+  },
+  "summary": {
+    "what_we_were_doing": "Evolved wispr-flow-dark-smokey from a fragile v1.1.0 dark mode script into a production-quality v1.3.0 tool, with three expert agent audits (bash, CSS, Electron), then began scoping a broader context-warming/verification system and Bear note capture pipeline.",
+    "key_decisions": [
+      "CSS uses filter inversion (invert .85, hue-rotate 180, sepia .30, brightness .95) — only durable approach for CSS Modules apps with hashed class names",
+      "Modal overlays targeted by exact CSS Module hashes (.mgB3HwW13t29DKsEkfUD, .Lo3Dvv9YLP6w7ogTpGvR, .h4ZXMTnO1FZBj82_Jjao) — break on app updates, documented with grep command to find new ones",
+      "asar upgraded to @electron/asar@4.2.0, backup now includes .unpacked/ dir for native binaries",
+      "Script renamed from wispr-dark-mode to wispr-flow-dark-smokey — all naming synced (display: 'Wispr Flow Dark-Smokey', code: 'wispr-flow-dark-smokey')",
+      "Idempotent strip-and-repatch pattern replaces skip-if-patched — allows CSS updates without full restore cycle",
+      "Three expert agents dispatched in parallel (bash/CLI, CSS/UI, Electron) — user expects this pattern for all multi-domain work"
+    ],
+    "current_blockers": [
+      "UNCOMMITTED: v1.3.0 script, CLAUDE.md, README.md not committed or pushed to GitHub — must do this first",
+      "UNCOMMITTED: Open security PR #1 on GitHub (mktemp for temp files) — already incorporated in v1.3.0, PR can be closed",
+      "CSS TWEAK REQUESTED: User wants slightly darker, a few percent less sepia, slightly cooler white balance — adjust before committing",
+      "BEAR SKILL NOT BUILT: Research done (API docs scraped, grizzly CLI installed, openclaw/bear-notes skill installed) but proper Bear note creation skill with templates, image workflow, and correct URL encoding not yet built",
+      "CONTEXT WARMING: Core foundational problem identified but not solved — user cannot verify what context actually loaded at session start vs what Claude is faking",
+      "TERMINAL READABILITY: User frustrated with flat monochrome terminal output — wants visual hierarchy, color, possibly TUI-level formatting"
+    ],
+    "next_steps": [
+      "1. Tweak CSS: slightly darker (maybe invert .87), less sepia (maybe .22-.25), cooler white balance",
+      "2. Commit and push v1.3.0 to GitHub (script + CLAUDE.md + README.md), install to ~/.local/bin/",
+      "3. Close PR #1 on GitHub (security fix already in v1.3.0)",
+      "4. NEW SESSION: Context warming and verification system — the Memento problem. How to make session bootstrap reliable and provable.",
+      "5. NEW SESSION: Bear note capture pipeline — global skill with proper templates (CommonMark, not markdown images), grizzly CLI or correct x-callback-url encoding (%20 not +), image attachment via /add-file endpoint, web clipping via /grab-url",
+      "6. NEW SESSION: Terminal output readability — investigate outputStyle setting, statusLine customization, TUI libraries (charsm, ink), markdown formatting discipline",
+      "7. Explore ~/Claude/Github/darkreader as reference for CSS injection techniques"
+    ],
+    "files_touched": [
+      "wispr-flow-dark-smokey (script — renamed from wispr-dark-mode, v1.3.0)",
+      "CLAUDE.md (new — project docs with naming, patterns, gotchas)",
+      "README.md (updated — synced naming, v1.2.0 badges, dark dialog feature)",
+      "~/.claude/skills/electron-asar-patcher/SKILL.md (new — domain knowledge skill)",
+      "~/.local/bin/wispr-flow-dark-smokey (installed — but may be behind repo version)",
+      "~/Claude/Github/INDEX.md (new — 52 repo index)",
+      "~/Claude/Github/AGENTS.MD (new — skill/agent/CLAUDE.md discovery)",
+      "~/.claude/projects/-Users-macbookpro-Claude-Projects-wispr-flow-dark-mode/memory/ (4 memory files)"
+    ],
+    "important_context": "User (Simon) runs a complex AI tech stack: Claude Code (max plan), Obsidian vault (second brain), Bear app (curation intake), episodic memory plugin, mem0 databases, 52+ cloned GitHub repos. The CORE problem is not any single tool but context continuity — every new session starts amnesiac. User is frustrated by: (1) guessing instead of researching (ALWAYS use context7 + WebSearch + Exa + firecrawl before acting), (2) not dispatching domain-expert agents in parallel, (3) lazy/cheap tool usage (user pays for max plan, use it), (4) flat terminal output readability, (5) running ahead without alignment. Hardware: Intel i7-3615QM (2012 MacBook Pro) — NO Bun, NO AVX2. Bear notes MUST have: strict templates, images/screenshots, verbose detail, visual quality. Bear API: use %20 not + for spaces, images via /add-file not inline markdown, /grab-url for web clipping."
+  }
+}
