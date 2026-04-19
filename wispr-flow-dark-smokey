@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.3.2"
+VERSION="1.3.3"
 ASAR="${WISPR_PATH:-/Applications/Wispr Flow.app}/Contents/Resources/app.asar"
 UNPACKED="${ASAR}.unpacked"
 BACKUP="${ASAR}.bak"
@@ -106,15 +106,17 @@ npx --yes "$ASAR_CMD" extract "$BACKUP" "$WORKDIR/wispr"
 # Strategy: filter:invert on <html> flips the entire rendered UI to dark.
 # Everything below compensates for side-effects of that inversion:
 #
-#   1. invert(0.89)          — high invert for deep dark, avoids pure-black
+#   1. invert(0.91)          — high invert for deep dark, avoids pure-black
 #   2. hue-rotate(180deg)    — restores hue relationships after inversion
-#   3. sepia(0.07)           — subtle warmth, not brown
-#   4. brightness(0.95)      — minimal pullback to stay dark
-#   5. body::before smoke    — static radial gradients (no animation — GPU safe)
-#   6. --sand-* / --vast-*   — graduated near-white values so inversion
+#   3. brightness(0.93)      — minimal pullback to stay dark (no sepia — neutral tone)
+#   4. #15131a bg            — neutral dark with faint cool tint (no brown)
+#   5. --sand-* / --vast-*   — graduated near-white values so inversion
 #                              produces natural depth variation
-#   7. img/video/canvas      — counter-invert to restore natural media colours
-#   8. Overlay hashed classes — these change on app updates; see OVERLAY NOTE below
+#   6. img/video/canvas      — counter-invert to restore natural media colours
+#   7. Overlay hashed classes — these change on app updates; see OVERLAY NOTE below
+#
+# Removed in v1.3.3: animated body::before smoke gradient. It was running a 90s
+# infinite keyframe on a 120vw fixed overlay — constant GPU cost for subtle effect.
 #
 # OVERLAY NOTE: The hashed classes (.mgB3HwW13t29DKsEkfUD etc.) target specific
 # modal overlay elements. They break when Wispr Flow updates its CSS Modules hash.
@@ -122,7 +124,7 @@ npx --yes "$ASAR_CMD" extract "$BACKUP" "$WORKDIR/wispr"
 #   grep -r "position:fixed;inset:0;background-color:rgba" .webpack/renderer/
 # then update the three class selectors below and re-run this script.
 #
-DARK_CSS='<style data-wispr-dark-smokey>html{background:#141210!important;filter:invert(.89) hue-rotate(180deg) sepia(.07) brightness(.95)!important;-webkit-font-smoothing:antialiased!important}body{background:#141210!important}body::before{content:""!important;position:fixed!important;top:-10%!important;left:-10%!important;width:120%!important;height:120%!important;z-index:0!important;pointer-events:none!important;background:radial-gradient(ellipse 700px 500px at 25% 35%,rgba(195,180,165,.07),transparent 70%),radial-gradient(ellipse 600px 700px at 75% 65%,rgba(185,170,155,.055),transparent 70%),radial-gradient(ellipse 800px 400px at 50% 85%,rgba(190,175,160,.045),transparent 70%)!important;animation:wispr-smoke 90s ease-in-out infinite alternate!important}@keyframes wispr-smoke{0%{transform:translate(0,0) scale(1);opacity:.7}50%{transform:translate(20px,-15px) scale(1.04);opacity:.9}100%{transform:translate(-10px,10px) scale(.98);opacity:.75}}img,video,canvas,svg image,picture>img{filter:invert(1) hue-rotate(180deg)!important}:root{--sand-50:#fff!important;--sand-100:#fefefe!important;--sand-200:#fdfdfc!important;--sand-300:#fcfcfb!important;--sand-400:#fbfbfa!important;--sand-500:#fafaf9!important;--vast-50:#fefefe!important;--vast-100:#fdfdfc!important;--neutral-10:#fff!important}*:focus-visible{outline:2px solid rgba(100,149,237,.6)!important;outline-offset:2px!important}::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(128,128,128,.2);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:rgba(128,128,128,.5)}::-webkit-scrollbar-thumb:active{background:rgba(128,128,128,.7)}::selection{background:rgba(180,140,100,.35)!important;color:inherit!important}</style>'
+DARK_CSS='<style data-wispr-dark-smokey>html{background:#15131a!important;filter:invert(.91) hue-rotate(180deg) brightness(.93)!important;-webkit-font-smoothing:antialiased!important}body{background:#15131a!important}img,video,canvas,svg image,picture>img{filter:invert(1) hue-rotate(180deg)!important}:root{--sand-50:#fff!important;--sand-100:#fefefe!important;--sand-200:#fdfdfc!important;--sand-300:#fcfcfb!important;--sand-400:#fbfbfa!important;--sand-500:#fafaf9!important;--vast-50:#fefefe!important;--vast-100:#fdfdfc!important;--neutral-10:#fff!important}*:focus-visible{outline:2px solid rgba(100,149,237,.6)!important;outline-offset:2px!important}::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(128,128,128,.22);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:rgba(128,128,128,.5)}::-webkit-scrollbar-thumb:active{background:rgba(128,128,128,.7)}::selection{background:rgba(120,130,170,.35)!important;color:inherit!important}</style>'
 
 STATUS_CSS='<style data-wispr-dark-smokey>html,body{background:transparent!important}*{border-color:transparent!important;box-shadow:none!important}</style>'
 

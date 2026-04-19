@@ -37,14 +37,14 @@ wispr-flow-dark-smokey --version  # Print version
 - `meeting_recorder` renderer exists but intentionally not patched (transient window)
 
 ## CSS Strategy
-- `filter: invert(.89) hue-rotate(180deg) sepia(.07) brightness(.95)` on `html`
-- Background `#141210` on both `html` and `body` — prevents white flash during paint
-- Animated smoke: `body::before` radial gradients with 90s `wispr-smoke` keyframe
+- `filter: invert(.91) hue-rotate(180deg) brightness(.93)` on `html` — no sepia (neutral)
+- Background `#15131a` on both `html` and `body` — faint cool tint, no brown
+- No animated overlay (removed in v1.3.3 — was constant GPU cost for subtle effect)
 - CSS variable overrides: all `--sand-*`, `--vast-*`, `--neutral-10` forced to `#fff`
 - Modal overlays targeted by CSS Module hashed class names (see Overlay Hashes)
 - Images/video/canvas counter-inverted: `filter: invert(1) hue-rotate(180deg)`
 - `-webkit-font-smoothing: antialiased` prevents text bloom
-- Selection color: warm amber `rgba(180,140,100,.35)` matching smoky aesthetic
+- Selection color: cool slate `rgba(120,130,170,.35)` matching neutral dark aesthetic
 - Focus: `rgba(100,149,237,.6)` outline with 2px offset
 - Scrollbar: 5px width, hover + active states
 
