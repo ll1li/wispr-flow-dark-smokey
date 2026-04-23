@@ -142,7 +142,6 @@ If Wispr Flow restructures its renderer paths after an update, the script detect
 - macOS
 - [Wispr Flow](https://wispr.com/) installed in `/Applications/` (or set `WISPR_PATH`)
 - [Node.js](https://nodejs.org/) (any version that includes `npx`)
-- Internet connection on first run only (to download `@electron/asar@4.2.0`)
 
 ## Disclaimer
 
