@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.3.3"
+VERSION="1.4.0"
 ASAR="${WISPR_PATH:-/Applications/Wispr Flow.app}/Contents/Resources/app.asar"
 UNPACKED="${ASAR}.unpacked"
 BACKUP="${ASAR}.bak"
