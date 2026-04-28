@@ -1,28 +1,38 @@
 # Wispr Flow Dark-Smokey
 
 ## What This Is
-Bash script that injects dark CSS into Wispr Flow's Electron `app.asar` bundle.
-No build system, no dependencies beyond Node.js (`npx asar`).
+Bash + PowerShell scripts that inject dark CSS into Wispr Flow's Electron `app.asar` bundle.
+No build system, no dependencies beyond Node.js (`npx @electron/asar`).
 
 ## Naming
 - Display name: "Wispr Flow Dark-Smokey"
 - Code/path name: `wispr-flow-dark-smokey`
-- Script file: `wispr-flow-dark-smokey`
-- CLI command: `wispr-flow-dark-smokey`
+- Script files: `wispr-flow-dark-smokey` (macOS bash) and `wispr-flow-dark-smokey.ps1` (Windows PowerShell)
+- CLI command: `wispr-flow-dark-smokey` (macOS) / `.\wispr-flow-dark-smokey.ps1` (Windows)
 - CSS marker: `data-wispr-dark-smokey`
 - GitHub repo: `ll1li/wispr-flow-dark-smokey`
 
 ## Project Layout
-- `wispr-flow-dark-smokey` — the script (v1.3.3). Injects `<style>` before `</head>`, idempotent.
+- `wispr-flow-dark-smokey` — macOS bash script (v1.4.0). Injects `<style>` before `</head>`, idempotent.
+- `wispr-flow-dark-smokey.ps1` — Windows PowerShell port (v1.4.0). Same structure, auto-discovers Squirrel/MSI installs, refuses MS Store.
 - `banner.png` — hero image for README (replaced `screenshot.jpg` in v1.3.3)
-- Single-file project. No tests, no CI — manual verification only.
+- Two-file project (one per platform). No tests, no CI — manual verification only.
+- Both scripts share the same CSS by convention but are not auto-synced — they may diverge intentionally per-platform.
 
 ## Commands
 ```bash
+# macOS
 wispr-flow-dark-smokey            # Apply dark theme
 wispr-flow-dark-smokey --restore  # Restore original
 wispr-flow-dark-smokey --check    # Check if applied
 wispr-flow-dark-smokey --version  # Print version
+```
+```powershell
+# Windows
+.\wispr-flow-dark-smokey.ps1           # Apply
+.\wispr-flow-dark-smokey.ps1 -Restore  # Restore
+.\wispr-flow-dark-smokey.ps1 -Check    # Check
+.\wispr-flow-dark-smokey.ps1 -Version  # Version
 ```
 
 ## Key Patterns
@@ -60,17 +70,35 @@ grep -r "position:fixed;inset:0;background-color:rgba" .webpack/renderer/
 ## Dependencies
 - `@electron/asar@4.2.0` (pinned, not the deprecated `asar` package)
 - Node.js (any version with npx)
-- macOS (Wispr Flow target platform)
+- macOS or Windows 10+ (Wispr Flow target platforms)
+- Windows: PowerShell 5.1+ (preinstalled) or PowerShell 7+
 
 ## Process Management
-- Use `pgrep -f` (not `-x`) to catch all Electron helper processes (GPU, Renderer, Plugin)
-- `killall 'Wispr Flow'` sends SIGTERM cascading to all children
+- macOS: `pgrep -f` (not `-x`) to catch Electron helper processes (GPU, Renderer, Plugin); `killall 'Wispr Flow'` cascades SIGTERM to children
+- Windows: `Get-Process -Name 'Wispr Flow'` returns the main process and helpers; `Stop-Process -Force` is the equivalent of SIGKILL. Capture `.Path` BEFORE killing to know what to relaunch.
+- Both: poll up to 5s after kill before proceeding to file ops, to avoid file-locking races
 
 ## macOS Security
 - Replacing `app.asar` invalidates codesign sealed resources — expected and safe
 - Gatekeeper does not re-check previously approved apps
 - No ASAR integrity checking in current Wispr Flow (no `ElectronAsarIntegrity` in Info.plist)
 - If future Wispr Flow adds integrity checking, patch will fail at startup — check Info.plist
+
+## Windows Install Paths
+Three Wispr Flow install types on Windows. Script auto-detects in this order:
+
+1. **Microsoft Store** (`Get-AppxPackage *WisprFlow*`) — **refused with redirect**. Lives in `C:\Program Files\WindowsApps\` (TrustedInstaller-locked); modifying breaks UWP signature so app refuses to launch. Script tells user to uninstall and grab the `.exe` from wisprflow.ai.
+2. **MSI / enterprise** — `%ProgramFiles%\Wispr Flow\resources\app.asar`. Stable path.
+3. **Squirrel `.exe` (default end-user)** — `%LocalAppData%\WisprFlow\app-{version}\resources\app.asar`. **Path drifts on every auto-update** (new `app-{version}` dir each time). Script picks newest by `LastWriteTime`.
+
+Override with `$env:WISPR_PATH` set to the full path of `app.asar`.
+
+## Windows Gotchas
+- Squirrel's `app-{version}` folder rotates on every auto-update — patch silently lost, just re-run the script
+- `Set-Content -Encoding UTF8` adds a BOM in PowerShell 5.1; use `[System.IO.File]::WriteAllText` with `UTF8Encoding($false)` to write UTF-8 without BOM and match Electron's webpack output
+- PowerShell `-replace` operator treats `$` specially in the replacement string; use string `.Replace()` or `[regex]::Replace()` when payload contains `$` chars
+- `Move-Item -Force` is atomic on the same volume — use it for the temp-asar swap
+- Execution policy: users must `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once before running unsigned local scripts
 
 ## Testing
 - Manual only: run `wispr-flow-dark-smokey`, visually verify in Wispr Flow

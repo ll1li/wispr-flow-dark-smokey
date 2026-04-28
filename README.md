@@ -2,14 +2,14 @@
   Wispr Flow Dark-Smokey
 </h1>
 
-<h4 align="center">A one-command dark theme for <a href="https://wispr.com/" target="_blank">Wispr Flow</a> on macOS — clean, neutral dark, no eye strain.</h4>
+<h4 align="center">A one-command dark theme for <a href="https://wispr.com/" target="_blank">Wispr Flow</a> on macOS and Windows — clean, neutral dark, no eye strain.</h4>
 
 <p align="center">
   <a href="https://github.com/ll1li/wispr-flow-dark-smokey/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/ll1li/wispr-flow-dark-smokey?style=flat-square" alt="License">
   </a>
-  <img src="https://img.shields.io/badge/version-1.3.3-blue?style=flat-square" alt="Version">
-  <img src="https://img.shields.io/badge/platform-macOS-blue?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/version-1.4.0-blue?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/requires-Node.js-green?style=flat-square" alt="Requires Node.js">
 </p>
 
@@ -46,6 +46,8 @@ Wispr Flow ships with a hardcoded white UI and no dark mode option. Late-night d
 
 ## Install
 
+### macOS
+
 ```bash
 mkdir -p ~/.local/bin
 curl -fsSL https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smokey/main/wispr-flow-dark-smokey \
@@ -60,7 +62,26 @@ export PATH="$HOME/.local/bin:$PATH"
 
 Add that line to your `~/.zshrc` or `~/.bash_profile` to make it permanent.
 
+### Windows
+
+```powershell
+$dir = "$env:USERPROFILE\.local\bin"
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smokey/main/wispr-flow-dark-smokey.ps1 `
+  -OutFile "$dir\wispr-flow-dark-smokey.ps1"
+```
+
+PowerShell execution policy must allow local scripts. One-time per user:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+> **Microsoft Store users:** uninstall the Store version and download the `.exe` from [wisprflow.ai/get-started](https://wisprflow.ai/get-started). MS Store apps are signature-locked and cannot be patched — the script detects this and refuses with a clear message.
+
 ## Usage
+
+### macOS
 
 ```bash
 wispr-flow-dark-smokey            # Apply dark theme (auto-restarts Wispr Flow)
@@ -70,13 +91,30 @@ wispr-flow-dark-smokey --version  # Print version
 wispr-flow-dark-smokey --help     # Show all options
 ```
 
-**Custom install path:** Set `WISPR_PATH` to override the default `/Applications/Wispr Flow.app` location:
+### Windows
+
+```powershell
+.\wispr-flow-dark-smokey.ps1            # Apply dark theme (auto-restarts Wispr Flow)
+.\wispr-flow-dark-smokey.ps1 -Restore   # Revert to the original
+.\wispr-flow-dark-smokey.ps1 -Check     # Check whether the theme is currently applied
+.\wispr-flow-dark-smokey.ps1 -Version   # Print version
+.\wispr-flow-dark-smokey.ps1 -Help      # Show all options
+```
+
+**Custom install path:** Set `WISPR_PATH` to override the default install location.
 
 ```bash
+# macOS — point at the .app bundle
 WISPR_PATH="/path/to/Wispr Flow.app" wispr-flow-dark-smokey
 ```
 
-> Wispr Flow auto-updates silently overwrite the patch. Just re-run `wispr-flow-dark-smokey` after any app update.
+```powershell
+# Windows — point at the full app.asar path
+$env:WISPR_PATH = "C:\path\to\resources\app.asar"
+.\wispr-flow-dark-smokey.ps1
+```
+
+> Wispr Flow auto-updates silently overwrite the patch. Just re-run the script after any app update. On Windows, Squirrel updates create a new `app-{version}` folder each time — the script auto-discovers the latest one.
 
 ## How It Works
 
@@ -130,18 +168,29 @@ Replacing `app.asar` invalidates the bundle's codesign seal. This is expected: G
 
 ## Compatibility
 
-| Wispr Flow | Dark-Smokey | Status |
-|------------|-------------|--------|
-| 1.4.x      | v1.3.3      | Tested |
-| 1.3.x      | v1.3.3      | Tested |
+| Wispr Flow | Dark-Smokey | Platform        | Status |
+|------------|-------------|-----------------|--------|
+| 1.4.x      | v1.4.0      | macOS / Windows | Tested |
+| 1.3.x      | v1.3.3      | macOS           | Tested |
 
 If Wispr Flow restructures its renderer paths after an update, the script detects the missing file and exits with an error instead of silently failing.
 
+### Windows install paths
+
+The Windows script auto-detects three install types:
+
+| Installer         | Location                                                              | Supported |
+|-------------------|-----------------------------------------------------------------------|-----------|
+| `.exe` (Squirrel) | `%LocalAppData%\WisprFlow\app-{version}\resources\app.asar`           | Yes       |
+| `.msi` (enterprise)| `%ProgramFiles%\Wispr Flow\resources\app.asar`                       | Yes       |
+| Microsoft Store   | `C:\Program Files\WindowsApps\…`                                      | No — see install note |
+
 ## Requirements
 
-- macOS
-- [Wispr Flow](https://wispr.com/) installed in `/Applications/` (or set `WISPR_PATH`)
+- macOS or Windows 10+
+- [Wispr Flow](https://wispr.com/) — `.app` bundle on macOS, or `.exe`/`.msi` install on Windows (not the Microsoft Store version)
 - [Node.js](https://nodejs.org/) (any version that includes `npx`)
+- Windows: PowerShell 5.1+ (preinstalled) or PowerShell 7+
 
 ## Disclaimer
 
