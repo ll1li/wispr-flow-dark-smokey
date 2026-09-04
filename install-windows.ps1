@@ -6,14 +6,24 @@
 
 .DESCRIPTION
   Downloads (or copies, when run from a clone) the .ps1 + .cmd into
-  $env:USERPROFILE\.local\bin\, then verifies that directory is on the user PATH.
+  $env:USERPROFILE\.local\bin\, applies the theme right away, and registers a
+  scheduled task that re-applies it after Wispr Flow auto-updates.
 
 .PARAMETER FromClone
   Install from the local repo clone instead of GitHub raw URLs.
-  Use when you've already cloned the repo and want to install your local copy.
+
+.PARAMETER NoApply
+  Install the command only; do not patch Wispr Flow now.
+
+.PARAMETER NoAuto
+  Do not register the re-apply scheduled task.
 
 .EXAMPLE
   iwr -useb https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smokey/main/install-windows.ps1 | iex
+
+.EXAMPLE
+  # Command + theme, no scheduled task:
+  & ([scriptblock]::Create((iwr -useb https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smokey/main/install-windows.ps1))) -NoAuto
 
 .EXAMPLE
   # From a local clone:
@@ -22,7 +32,9 @@
 
 [CmdletBinding()]
 param(
-    [switch]$FromClone
+    [switch]$FromClone,
+    [switch]$NoApply,
+    [switch]$NoAuto
 )
 
 $ErrorActionPreference = 'Stop'
@@ -58,8 +70,34 @@ foreach ($file in $Files) {
     }
 }
 
+$Ps1 = Join-Path $BinDir 'wispr-flow-dark-smokey.ps1'
+
+Write-Host ''
+Write-Host '----------------------------------------------------------------------'
+Write-Host "Installed to: $BinDir" -ForegroundColor Green
+Write-Host '----------------------------------------------------------------------'
+
 # ----------------------------------------------------------------------------
-# PATH check — non-destructive: warn the user with a copy-pasteable fix.
+# Apply now, so the theme is on without a second command. A missing Wispr Flow
+# or Node.js is reported, not fatal: the command is installed either way.
+# ----------------------------------------------------------------------------
+
+if (-not $NoApply) {
+    Write-Host ''
+    & $Ps1 --ensure          # applies only when missing; a re-run never restarts a themed app
+    & $Ps1 --check
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Theme not applied yet (see above). Run 'wispr-flow-dark-smokey' once that is fixed." -ForegroundColor Yellow
+    }
+}
+
+if (-not $NoAuto) {
+    Write-Host ''
+    & $Ps1 --enable-auto
+}
+
+# ----------------------------------------------------------------------------
+# PATH check - non-destructive: warn the user with a copy-pasteable fix.
 # (We don't silently mutate PATH; that's surprising and hard to undo.)
 # ----------------------------------------------------------------------------
 
@@ -67,34 +105,18 @@ $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 $pathParts = if ($userPath) { $userPath -split ';' | Where-Object { $_ } } else { @() }
 $onPath = $pathParts -contains $BinDir -or $pathParts -contains $BinDir.TrimEnd('\')
 
-Write-Host ''
-Write-Host '----------------------------------------------------------------------'
-Write-Host "Installed to: $BinDir" -ForegroundColor Green
-Write-Host '----------------------------------------------------------------------'
-
 if (-not $onPath) {
     Write-Host ''
-    Write-Host "  $BinDir is NOT on your user PATH yet." -ForegroundColor Yellow
-    Write-Host '  Add it (one-time, persists across sessions) by running this in a NEW PowerShell window:' -ForegroundColor Yellow
+    Write-Host "  To use the command by name, add $BinDir to your user PATH once (new PowerShell window):" -ForegroundColor Yellow
     Write-Host ''
-    Write-Host '      [Environment]::SetEnvironmentVariable(' -ForegroundColor Cyan -NoNewline
-    Write-Host "'Path'," -ForegroundColor Cyan -NoNewline
-    Write-Host ' ' -NoNewline
-    Write-Host "([Environment]::GetEnvironmentVariable('Path','User') + ';$BinDir')," -ForegroundColor Cyan -NoNewline
-    Write-Host ' ' -NoNewline
-    Write-Host "'User'" -ForegroundColor Cyan -NoNewline
-    Write-Host ')' -ForegroundColor Cyan
+    Write-Host "      [Environment]::SetEnvironmentVariable('Path', ([Environment]::GetEnvironmentVariable('Path','User') + ';$BinDir'), 'User')" -ForegroundColor Cyan
     Write-Host ''
-    Write-Host '  Then close and reopen your shell.' -ForegroundColor Yellow
-}
-else {
-    Write-Host ''
-    Write-Host "  PATH already includes $BinDir - you're good." -ForegroundColor Green
+    Write-Host '  Then close and reopen your shell. The theme and the re-apply task work without this.' -ForegroundColor Yellow
 }
 
 Write-Host ''
-Write-Host 'Try it:' -ForegroundColor Cyan
-Write-Host '  wispr-flow-dark-smokey --version'
-Write-Host '  wispr-flow-dark-smokey --check'
-Write-Host '  wispr-flow-dark-smokey'
+Write-Host 'Commands:' -ForegroundColor Cyan
+Write-Host '  wispr-flow-dark-smokey --check        # is the theme on?'
+Write-Host '  wispr-flow-dark-smokey --restore      # back to the original look'
+Write-Host '  wispr-flow-dark-smokey --uninstall    # restore, remove the task and the command'
 Write-Host ''

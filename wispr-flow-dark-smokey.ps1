@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 #Requires -Version 5.1
 <#
 .SYNOPSIS
@@ -16,9 +16,16 @@
 
 $ErrorActionPreference = 'Stop'
 
-$Version = '1.4.0'
+$Version = '1.5.0'
 $Marker  = 'data-wispr-dark-smokey'
 $AsarCmd = '@electron/asar@4.2.0'   # pinned — no supply-chain surprise
+
+# Auto re-apply: a per-user scheduled task that runs `--ensure` one minute after
+# logon and every four hours, so a Squirrel auto-update never leaves the app white.
+$TaskName = 'WisprFlowDarkSmokey'
+$StampDir = Join-Path $env:LOCALAPPDATA 'wispr-flow-dark-smokey'
+$Stamp    = Join-Path $StampDir 'ensure-failed'   # asar identity of the last failed --ensure; stops retry loops
+$Ensure   = $false
 
 # ----------------------------------------------------------------------------
 # Argument parsing — supports both bash-style (--restore) and PowerShell-style
@@ -29,16 +36,20 @@ function Show-Usage {
     @"
 wispr-flow-dark-smokey $Version - dark theme for Wispr Flow
 
-Usage: wispr-flow-dark-smokey [--restore|--check|--version|--help]
+Usage: wispr-flow-dark-smokey [option]
 
-  (no args)    Apply the dark theme
-  --restore    Restore original Wispr Flow
-  --check      Check if the theme is currently applied
-  --version    Print version
-  --help       Show this help
+  (no args)       Apply the dark theme (restarts Wispr Flow)
+  --restore       Restore original Wispr Flow
+  --check         Check if the theme is applied (exit 0 = applied, 1 = not)
+  --ensure        Apply only if not applied; quiet, never restarts a themed app
+  --enable-auto   Keep the theme across Wispr Flow updates (scheduled task)
+  --disable-auto  Remove the scheduled task
+  --uninstall     Restore the app, remove the task and this command
+  --version       Print version
+  --help          Show this help
 
 Set WISPR_PATH (env var) to override the default install location.
-PowerShell-native flags (-Restore, -Check, -Version) work too.
+PowerShell-native flags (-Restore, -Check, -Ensure, -EnableAuto, ...) work too.
 "@
 }
 
@@ -53,6 +64,10 @@ while ($i -lt $argList.Count) {
         '^(--version|-Version|-v)$'                { "wispr-flow-dark-smokey $Version"; exit 0 }
         '^(--restore|-Restore)$'                   { $Action = 'restore'; $i++; continue }
         '^(--check|-Check)$'                       { $Action = 'check';   $i++; continue }
+        '^(--ensure|-Ensure)$'                     { $Action = 'apply'; $Ensure = $true; $i++; continue }
+        '^(--enable-auto|-EnableAuto)$'            { $Action = 'enable-auto';  $i++; continue }
+        '^(--disable-auto|-DisableAuto)$'          { $Action = 'disable-auto'; $i++; continue }
+        '^(--uninstall|-Uninstall)$'               { $Action = 'uninstall';    $i++; continue }
         default {
             Write-Host "Error: unknown argument '$a'" -ForegroundColor Red
             Write-Host ''
@@ -150,20 +165,91 @@ function Start-WisprFlow {
 }
 
 # ----------------------------------------------------------------------------
+# Auto re-apply: scheduled task running this script with --ensure, as the
+# current user, hidden. Two triggers: one minute after logon (Wispr Flow starts
+# from the Startup folder around the same time) and every four hours.
+# ----------------------------------------------------------------------------
+
+function Enable-Auto {
+    $hostExe = (Get-Process -Id $PID).Path            # the pwsh/powershell running right now
+    $argLine = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$PSCommandPath`" --ensure"
+    $action  = New-ScheduledTaskAction -Execute $hostExe -Argument $argLine
+    $user    = "$env:USERDOMAIN\$env:USERNAME"
+    $logon   = New-ScheduledTaskTrigger -AtLogOn -User $user
+    $logon.Delay = 'PT1M'
+    $repeat  = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5) -RepetitionInterval (New-TimeSpan -Hours 4)
+    $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable `
+        -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
+    $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($logon, $repeat) -Settings $settings `
+        -Principal $principal -Description 'Re-applies the Wispr Flow Dark-Smokey theme after Wispr Flow updates.' -Force | Out-Null
+    Write-Host "Auto re-apply enabled: scheduled task '$TaskName'" -ForegroundColor Green
+    Write-Host "Runs '$PSCommandPath --ensure' a minute after logon and every 4 hours."
+}
+
+function Disable-Auto {
+    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+        Write-Host 'Auto re-apply disabled.'
+    }
+    else {
+        Write-Host 'Auto re-apply was not enabled.'
+    }
+}
+
+if ($Action -eq 'enable-auto')  { Enable-Auto;  exit 0 }
+if ($Action -eq 'disable-auto') { Disable-Auto; exit 0 }
+
+if ($Action -eq 'uninstall') {
+    $asar = Get-WisprAsarPath
+    if ($asar -and (Test-Path -LiteralPath "$asar.bak")) {
+        & $PSCommandPath --restore
+    }
+    else {
+        Write-Host 'No backup found - Wispr Flow left as is.'
+    }
+    Disable-Auto
+    if (Test-Path -LiteralPath $StampDir) { Remove-Item -LiteralPath $StampDir -Recurse -Force -ErrorAction SilentlyContinue }
+    $cmdShim = [System.IO.Path]::ChangeExtension($PSCommandPath, '.cmd')
+    foreach ($f in @($PSCommandPath, $cmdShim)) {
+        if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force }
+    }
+    Write-Host "Removed $PSCommandPath. Wispr Flow Dark-Smokey is uninstalled." -ForegroundColor Green
+    exit 0
+}
+
+# ----------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------
 
 $asarPath = Get-WisprAsarPath
 if (-not $asarPath) {
+    if ($Ensure) { exit 0 }   # nothing to keep dark; stay quiet for the scheduled task
     $hint = if ($env:WISPR_PATH) { "(WISPR_PATH=$env:WISPR_PATH)" } else { "(default: $env:LOCALAPPDATA\WisprFlow)" }
     Write-Host "Error: Wispr Flow not found $hint" -ForegroundColor Red
     Write-Host "Install Wispr Flow from https://wispr.com/, or set WISPR_PATH to a custom location." -ForegroundColor Yellow
     exit 1
 }
 
+# The scheduled task inherits the user environment, but be generous about where
+# node lives (nodejs.org MSI, winget, nvm-windows, fnm, volta).
+$env:Path += ";$env:ProgramFiles\nodejs;$env:APPDATA\npm;$env:LOCALAPPDATA\Programs\nodejs;$env:NVM_SYMLINK;$env:LOCALAPPDATA\Volta\bin;$env:LOCALAPPDATA\fnm_multishells"
 if (-not (Get-Command npx -ErrorAction SilentlyContinue)) {
+    if ($Ensure) { Write-Host 'npx not found; cannot re-apply'; exit 0 }
     Write-Host "Error: Node.js required (npx not found). Install: https://nodejs.org" -ForegroundColor Red
     exit 1
+}
+
+# The asar format stores HTML uncompressed, so the marker is searchable as a
+# literal substring inside the binary — no extract needed. Codepage 28591
+# (Latin1) round-trips bytes on both .NET Framework (PS 5.1) and .NET 6+.
+function Test-Applied([string]$path) {
+    $bytes = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::GetEncoding(28591))
+    return $bytes.Contains($Marker)
+}
+function Get-AsarId([string]$path) {
+    $f = Get-Item -LiteralPath $path
+    return "$($f.LastWriteTimeUtc.Ticks):$($f.Length)"
 }
 
 $unpacked       = "$asarPath.unpacked"
@@ -177,27 +263,32 @@ $tmpFile       = $null
 $workDir       = $null
 
 # ----------------------------------------------------------------------------
-# --check: fast path, no extract — search asar bytes directly. The asar format
-# stores HTML uncompressed, so the marker is searchable as a literal substring
-# inside the binary. ~100x faster than extracting 115 MB to grep one HTML file.
+# --check: fast path, no extract. Exit 0 when applied, 1 when not, so scripts
+# and the scheduled task can branch on it.
 # ----------------------------------------------------------------------------
 if ($Action -eq 'check') {
     try {
-        # Codepage 28591 = ISO-8859-1 (Latin1). Round-trip-safe for binary->string
-        # mapping; portable across .NET Framework (PS 5.1) and .NET 6+ (PS 7+).
-        $bytes = [System.IO.File]::ReadAllText($asarPath, [System.Text.Encoding]::GetEncoding(28591))
-        if ($bytes.Contains($Marker)) {
-            "Dark Smokey is applied."
-        }
-        else {
-            "Dark Smokey is not applied."
-        }
+        if (Test-Applied $asarPath) { "Dark Smokey is applied."; exit 0 }
+        "Dark Smokey is not applied."; exit 1
     }
     catch {
         Write-Host "Error reading asar: $_" -ForegroundColor Red
-        exit 1
+        exit 2
     }
-    exit 0
+}
+
+# ----------------------------------------------------------------------------
+# --ensure: only act when the theme is missing, and do not retry an asar that
+# already failed once (a restructured Wispr Flow would otherwise get its app
+# killed and restarted on every trigger).
+# ----------------------------------------------------------------------------
+if ($Ensure) {
+    if (Test-Applied $asarPath) { exit 0 }
+    if ((Test-Path -LiteralPath $Stamp) -and ((Get-Content -LiteralPath $Stamp -Raw).Trim() -eq (Get-AsarId $asarPath))) {
+        Write-Host 'skipping: last attempt on this Wispr Flow build failed'
+        exit 0
+    }
+    Write-Host "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') theme missing - re-applying ($asarPath)"
 }
 
 # ----------------------------------------------------------------------------
@@ -360,6 +451,17 @@ try {
     Write-Host "Done. Wispr Flow Dark-Smokey applied." -ForegroundColor Green
 }
 finally {
+    if ($Ensure -and $Action -eq 'apply') {
+        if ($asarWritten) {
+            if (Test-Path -LiteralPath $Stamp) { Remove-Item -LiteralPath $Stamp -Force -ErrorAction SilentlyContinue }
+        }
+        else {
+            try {
+                New-Item -ItemType Directory -Path $StampDir -Force | Out-Null
+                Set-Content -LiteralPath $Stamp -Value (Get-AsarId $asarPath) -Encoding ascii
+            } catch {}
+        }
+    }
     if ($workDir -and (Test-Path -LiteralPath $workDir)) {
         Remove-Item -LiteralPath $workDir -Recurse -Force -ErrorAction SilentlyContinue
     }

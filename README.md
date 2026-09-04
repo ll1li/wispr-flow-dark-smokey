@@ -2,13 +2,13 @@
   Wispr Flow Dark-Smokey
 </h1>
 
-<h4 align="center">A one-command dark theme for <a href="https://wispr.com/" target="_blank">Wispr Flow</a> on macOS and Windows — neutral, clean, and easy to live with.</h4>
+<h4 align="center">A dark theme for <a href="https://wispr.com/" target="_blank">Wispr Flow</a> on macOS and Windows. One install, applied at once, and it stays dark through Wispr Flow's updates.</h4>
 
 <p align="center">
   <a href="https://github.com/ll1li/wispr-flow-dark-smokey/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/ll1li/wispr-flow-dark-smokey?style=flat-square" alt="License">
   </a>
-  <img src="https://img.shields.io/badge/version-1.4.0-blue?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.5.0-blue?style=flat-square" alt="Version">
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/requires-Node.js-green?style=flat-square" alt="Requires Node.js">
 </p>
@@ -17,6 +17,7 @@
   <a href="#why">Why</a> •
   <a href="#install">Install</a> •
   <a href="#usage">Usage</a> •
+  <a href="#stays-dark-after-updates">Updates</a> •
   <a href="#how-it-works">How It Works</a> •
   <a href="#compatibility">Compatibility</a> •
   <a href="#license">License</a>
@@ -37,56 +38,76 @@ Wispr Flow ships with a hardcoded white UI and no dark mode option. If you use i
 | | |
 |---|---|
 | **Neutral dark tone** | `invert(.91) hue-rotate(180deg) brightness(.93)` — deep dark without a colour cast |
+| **Applied on install** | The installer patches Wispr Flow right away; no second command to run |
+| **Survives updates** | A LaunchAgent (macOS) or scheduled task (Windows) re-applies the theme after Wispr Flow auto-updates, only when it is actually missing |
 | **Zero GPU overhead** | No animated overlays, no atmospheric layers — static CSS only |
 | **Anti-flashbang** | Dark backstop on `<html>` and `<body>` prevents bright white flashes during startup and navigation |
 | **Uniform dark surfaces** | Overrides internal CSS variables so sidebar, content, and modals all match |
 | **Natural media** | Images, video, and canvas are counter-inverted so they render correctly |
 | **Atomic write** | Patches via temp file + rename, with size verification — never leaves a corrupt bundle |
-| **Idempotent** | Strips prior patches (any v1.x marker variant) before injecting; safe to re-run anytime |
-| **Fast `--check`** | Reads asar bytes directly — no extract, ~100× faster than v1.3.x |
-| **One-command restore** | `--restore` reverts to the original in seconds |
+| **Idempotent** | Strips prior patches before injecting; safe to re-run anytime |
+| **Fast `--check`** | Reads asar bytes directly — no extract; exit code tells scripts the state |
+| **One-command restore** | `--restore` reverts to the original in seconds, `--uninstall` removes everything |
 
 ## Install
 
-### macOS
+Requires [Node.js](https://nodejs.org/) (for `npx`) and Wispr Flow installed. The installer puts the
+command on your machine, applies the theme immediately, and switches on the re-apply hook described
+under [Stays dark after updates](#stays-dark-after-updates). Wispr Flow restarts once while the theme
+is applied.
 
-One-line install:
+### macOS
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smokey/main/install-macos.sh | bash
 ```
 
-The installer places `wispr-flow-dark-smokey` in `/usr/local/bin`, which is already on the default `PATH` on most macOS systems. It uses `sudo` only if needed.
+Installs `wispr-flow-dark-smokey` to `/usr/local/bin` (uses `sudo` only if that directory is not
+writable) and registers `~/Library/LaunchAgents/wispr-flow-dark-smokey.plist`.
 
-> **Manual install:** download `wispr-flow-dark-smokey` to `/usr/local/bin/` and make it executable.
+Options: `bash -s -- --no-auto` skips the LaunchAgent, `--no-apply` installs the command only.
+From a clone: `./install-macos.sh --from-clone`.
 
 ### Windows
 
-One-line install (works in PowerShell 7+ and the built-in PowerShell 5.1):
+Works in PowerShell 7+ and the built-in PowerShell 5.1:
 
 ```powershell
 iwr -useb https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smokey/main/install-windows.ps1 | iex
 ```
 
-The installer drops `wispr-flow-dark-smokey.ps1` and `wispr-flow-dark-smokey.cmd` into `%USERPROFILE%\.local\bin\` and prints a one-liner to add that directory to your user `PATH` if it isn't already there.
+Installs `wispr-flow-dark-smokey.ps1` and a `.cmd` shim to `%USERPROFILE%\.local\bin\` and registers
+the scheduled task `WisprFlowDarkSmokey` for the current user. If that directory is not on your
+`PATH`, the installer prints the one-liner to add it; the theme and the task work without it.
 
-After install, you can run `wispr-flow-dark-smokey` from PowerShell, cmd, Windows Terminal, or any launcher — the `.cmd` shim forwards everything to PowerShell transparently.
+Options: `-NoAuto` skips the scheduled task, `-NoApply` installs the command only, `-FromClone`
+installs from a checkout:
 
-> **Manual install:** download `wispr-flow-dark-smokey.ps1` and `wispr-flow-dark-smokey.cmd` to a directory on your `PATH` and you're done. No build step.
+```powershell
+& ([scriptblock]::Create((iwr -useb https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smokey/main/install-windows.ps1))) -NoAuto
+```
+
+> **Manual install:** copy the script(s) to a directory on your `PATH`, then run
+> `wispr-flow-dark-smokey` and `wispr-flow-dark-smokey --enable-auto`.
 
 ## Usage
 
 ```bash
-wispr-flow-dark-smokey            # Apply the dark theme (auto-restarts Wispr Flow)
-wispr-flow-dark-smokey --restore  # Revert to the original
-wispr-flow-dark-smokey --check    # Check whether the theme is currently applied
-wispr-flow-dark-smokey --version  # Print version
-wispr-flow-dark-smokey --help     # Show all options
+wispr-flow-dark-smokey                 # Apply the dark theme (restarts Wispr Flow)
+wispr-flow-dark-smokey --restore       # Revert to the original
+wispr-flow-dark-smokey --check         # Is it applied? exit 0 = yes, 1 = no
+wispr-flow-dark-smokey --ensure        # Apply only if missing; quiet, never restarts a themed app
+wispr-flow-dark-smokey --enable-auto   # Register the re-apply hook (LaunchAgent / scheduled task)
+wispr-flow-dark-smokey --disable-auto  # Remove it
+wispr-flow-dark-smokey --uninstall     # Restore Wispr Flow, remove the hook and the command
+wispr-flow-dark-smokey --version
+wispr-flow-dark-smokey --help
 ```
 
-The same flags work on Windows. PowerShell-native style is also accepted (`-Restore`, `-Check`, `-Version`).
+The same flags work on Windows. PowerShell-native style is also accepted (`-Restore`, `-Check`,
+`-Ensure`, `-EnableAuto`, `-DisableAuto`, `-Uninstall`, `-Version`).
 
-**Custom install path:** Set `WISPR_PATH` to override the default Wispr Flow location:
+**Custom install path:** set `WISPR_PATH` to override the default Wispr Flow location:
 
 ```bash
 # macOS
@@ -96,42 +117,58 @@ WISPR_PATH="/path/to/Wispr Flow.app" wispr-flow-dark-smokey
 $env:WISPR_PATH = "D:\Apps\WisprFlow"; wispr-flow-dark-smokey
 ```
 
-> Wispr Flow auto-updates silently overwrite the patch on macOS, and create a new versioned install directory on Windows. Just re-run `wispr-flow-dark-smokey` after any app update.
+## Stays dark after updates
 
-## Updating
+Wispr Flow auto-updates silently. On macOS the update overwrites the patched bundle; on Windows,
+Squirrel installs the new version into a fresh `app-X.Y.Z\` directory. Either way the theme is gone
+until something re-applies it. The installer sets that up:
 
-Wispr Flow updates overwrite the patch on macOS and create a new versioned install directory on Windows. After any Wispr Flow update, just run `wispr-flow-dark-smokey` again.
+| | macOS | Windows |
+|---|---|---|
+| Mechanism | per-user LaunchAgent `wispr-flow-dark-smokey` | per-user scheduled task `WisprFlowDarkSmokey` |
+| Runs | at login, every hour, and whenever `app.asar` changes (`WatchPaths`) | one minute after logon and every 4 hours, hidden |
+| Command | `wispr-flow-dark-smokey --ensure` | `wispr-flow-dark-smokey.ps1 --ensure` |
+| Log | `$TMPDIR/wispr-flow-dark-smokey.log` | Task Scheduler history |
+| Remove | `--disable-auto` | `--disable-auto` |
+
+`--ensure` reads the bundle bytes first and exits immediately when the marker is present, so a
+themed app is never touched or restarted. When the theme is missing it applies it, which restarts
+Wispr Flow once. If applying fails on a given Wispr Flow build (for example a future restructure
+of the renderer paths), `--ensure` remembers that build and does not retry it, so a broken update
+cannot turn into an app that restarts every hour. Run `wispr-flow-dark-smokey` by hand to retry.
+
+No admin rights, no password stored: the task and the agent run as you, in your session.
 
 ## Restore / Uninstall
 
-To remove the theme and go back to the original app bundle:
-
 ```bash
-wispr-flow-dark-smokey --restore
+wispr-flow-dark-smokey --restore     # original look back, keeps the command and the hook
+wispr-flow-dark-smokey --uninstall   # restore + remove the hook + delete the command
 ```
-
-To remove only the installed command:
-
-* macOS: delete `/usr/local/bin/wispr-flow-dark-smokey`
-* Windows: delete `wispr-flow-dark-smokey.ps1` and `wispr-flow-dark-smokey.cmd` from `%USERPROFILE%\.local\bin\`
 
 ## Troubleshooting
 
 ### `npx not found`
 
-Install [Node.js](https://nodejs.org/). The patcher uses `npx` to run `@electron/asar@4.2.0`.
+Install [Node.js](https://nodejs.org/). The patcher uses `npx` to run `@electron/asar@4.2.0`. The
+scripts also look in the usual Homebrew, nodejs.org, nvm, fnm and volta locations, because launchd
+and Task Scheduler start with a smaller `PATH` than your shell.
 
 ### `Wispr Flow not found`
 
 Install Wispr Flow first, or set `WISPR_PATH` to a custom install location.
 
-### The patch disappeared after a Wispr Flow update
+### The app is white again after an update
 
-That is expected. Wispr Flow updates replace the patched bundle on macOS and move Windows installs to a new versioned directory. Re-run the command after each app update.
+With the re-apply hook enabled this should fix itself within an hour (macOS) or four hours
+(Windows), or at the next login. To force it now: `wispr-flow-dark-smokey`. If it keeps coming
+back white, check the log (macOS) or Task Scheduler history (Windows): an apply that fails on a
+new Wispr Flow build is recorded and not retried; that is the signal to update this project.
 
 ### Windows says the command is not found right after install
 
-Open a new terminal window so the updated user `PATH` is picked up, or run the script directly from `%USERPROFILE%\.local\bin\`.
+Open a new terminal window so the updated user `PATH` is picked up, or run the script directly from
+`%USERPROFILE%\.local\bin\`.
 
 ## How It Works
 
@@ -156,6 +193,7 @@ Four renderers are patched: `hub`, `scratchpad`, `contextMenu`, and `status`. Th
 - **Post-inject verification** — the script checks for the CSS marker after injection and exits loudly if it is missing
 - **Pinned asar version** — `@electron/asar@4.2.0`; no floating dependency, predictable behaviour
 - **Backward-compatible strip** — the strip regex matches any `<style data-wispr-dark-smokey…>` marker, so upgrading from any v1.x install is a clean overwrite
+- **No retry storms** — `--ensure` records a failed build and leaves it alone until you intervene
 
 <details>
 <summary>Platform-specific notes</summary>
@@ -166,11 +204,11 @@ Replacing `app.asar` invalidates the bundle's codesign seal. This is expected: G
 
 ### Windows / Squirrel
 
-Wispr Flow on Windows ships with the Squirrel installer, which keeps each version in its own `app-X.Y.Z\` directory under `%LOCALAPPDATA%\WisprFlow\`. Auto-updates create a new versioned directory and the patched one is left orphaned — the script always resolves the latest `app-X.Y.Z\resources\app.asar` at runtime, so the only thing you need to do after an update is re-run.
+Wispr Flow on Windows ships with the Squirrel installer, which keeps each version in its own `app-X.Y.Z\` directory under `%LOCALAPPDATA%\WisprFlow\`. Auto-updates create a new versioned directory and the patched one is left orphaned — the script always resolves the latest `app-X.Y.Z\resources\app.asar` at runtime, and the scheduled task takes care of re-running.
 
-There's a small race window: if Squirrel auto-updates between the script resolving the path and the atomic mv, the patch lands on the *previous* versioned directory while a new one is now active. Just re-run after the update completes.
+There's a small race window: if Squirrel auto-updates between the script resolving the path and the atomic mv, the patch lands on the *previous* versioned directory while a new one is now active. The next `--ensure` run fixes it.
 
-The `.cmd` shim picks `pwsh` (PowerShell 7+) when available and falls back to the built-in `powershell` (5.1). Both work; `pwsh` is faster.
+The `.cmd` shim picks `pwsh` (PowerShell 7+) when available and falls back to the built-in `powershell` (5.1). The scheduled task uses whichever host ran `--enable-auto`.
 
 </details>
 
@@ -178,7 +216,9 @@ The `.cmd` shim picks `pwsh` (PowerShell 7+) when available and falls back to th
 
 | Wispr Flow | Dark-Smokey | Status |
 |------------|-------------|--------|
+| 1.6.x (Win) | v1.5.0      | Tested |
 | 1.5.x (Win) | v1.4.0      | Tested |
+| 1.5.x (Mac) | v1.5.0      | Tested |
 | 1.4.x (Mac) | v1.4.0      | Tested |
 | 1.3.x (Mac) | v1.4.0      | Tested |
 

@@ -1,15 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Installs the wispr-flow-dark-smokey command, applies the theme right away and
+# registers a LaunchAgent that re-applies it after Wispr Flow updates.
+#
+#   curl -fsSL .../install-macos.sh | bash
+#   curl -fsSL .../install-macos.sh | bash -s -- --no-auto     # command + theme only
+#   ./install-macos.sh --from-clone                             # from a local checkout
+#
+# Flags: --from-clone  --no-apply  --no-auto
+
 RAW_BASE="https://raw.githubusercontent.com/ll1li/wispr-flow-dark-smokey/main"
 SCRIPT_NAME="wispr-flow-dark-smokey"
 TARGET_DIR="/usr/local/bin"
 TARGET_PATH="$TARGET_DIR/$SCRIPT_NAME"
 FROM_CLONE=0
+APPLY=1
+AUTO=1
 
-if [[ "${1:-}" == "--from-clone" ]]; then
-  FROM_CLONE=1
-fi
+for arg in "$@"; do
+  case "$arg" in
+    --from-clone) FROM_CLONE=1 ;;
+    --no-apply)   APPLY=0 ;;
+    --no-auto)    AUTO=0 ;;
+    *) echo "Unknown flag: $arg (use --from-clone, --no-apply, --no-auto)"; exit 1 ;;
+  esac
+done
 
 install_file() {
   local src="$1"
@@ -42,8 +58,24 @@ fi
 
 echo
 echo "Installed to: $TARGET_PATH"
+
+# Apply now, so the theme is on without a second command. A missing Wispr Flow
+# or Node.js is reported, not fatal: the command is installed either way.
+if [[ "$APPLY" == "1" ]]; then
+  echo
+  "$TARGET_PATH" --ensure || true     # applies only when missing; a re-run never restarts a themed app
+  if ! "$TARGET_PATH" --check; then
+    echo "Theme not applied yet (see above). Run '$SCRIPT_NAME' once that is fixed."
+  fi
+fi
+
+if [[ "$AUTO" == "1" ]]; then
+  echo
+  "$TARGET_PATH" --enable-auto
+fi
+
 echo
-echo "Try it:"
-echo "  wispr-flow-dark-smokey --version"
-echo "  wispr-flow-dark-smokey --check"
-echo "  wispr-flow-dark-smokey"
+echo "Commands:"
+echo "  $SCRIPT_NAME --check        # is the theme on?"
+echo "  $SCRIPT_NAME --restore      # back to the original look"
+echo "  $SCRIPT_NAME --uninstall    # restore, remove the LaunchAgent and the command"

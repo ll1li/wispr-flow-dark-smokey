@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.4.0"
+VERSION="1.5.0"
+
+# launchd starts agents with a bare PATH; make sure node/npx from the usual
+# installers (Homebrew, nodejs.org, nvm, fnm, volta) are reachable.
+PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.volta/bin:$HOME/.fnm/aliases/default/bin"
+for d in "$HOME"/.nvm/versions/node/*/bin; do [[ -d "$d" ]] && PATH="$PATH:$d"; done
+export PATH
+
 ASAR="${WISPR_PATH:-/Applications/Wispr Flow.app}/Contents/Resources/app.asar"
 UNPACKED="${ASAR}.unpacked"
 BACKUP="${ASAR}.bak"
@@ -9,6 +16,15 @@ BACKUP_UNPACKED="${BACKUP}.unpacked"
 ASAR_WRITTEN=0
 TMPFILE=""
 MARKER="data-wispr-dark-smokey"
+
+# Auto re-apply: a per-user LaunchAgent that runs `--ensure` at login, every
+# hour, and whenever app.asar changes (i.e. right after a Wispr Flow update).
+AGENT_LABEL="wispr-flow-dark-smokey"
+AGENT_PLIST="$HOME/Library/LaunchAgents/${AGENT_LABEL}.plist"
+AGENT_LOG="${TMPDIR:-/tmp}/${AGENT_LABEL}.log"
+STAMP_DIR="$HOME/.cache/${AGENT_LABEL}"
+STAMP="$STAMP_DIR/ensure-failed"   # asar identity of the last failed --ensure; stops retry loops
+ENSURE=0
 
 # Pinned version for predictable behaviour
 ASAR_CMD="@electron/asar@4.2.0"
@@ -21,13 +37,17 @@ usage() {
   cat <<EOF
 wispr-flow-dark-smokey $VERSION — dark theme for Wispr Flow
 
-Usage: wispr-flow-dark-smokey [--restore|--check|--version|--help]
+Usage: wispr-flow-dark-smokey [option]
 
-  (no args)    Apply the dark theme
-  --restore    Restore original Wispr Flow
-  --check      Check if the theme is currently applied
-  --version    Print version
-  --help       Show this help
+  (no args)       Apply the dark theme (restarts Wispr Flow)
+  --restore       Restore original Wispr Flow
+  --check         Check if the theme is applied (exit 0 = applied, 1 = not)
+  --ensure        Apply only if not applied; quiet, never restarts a themed app
+  --enable-auto   Keep the theme across Wispr Flow updates (LaunchAgent)
+  --disable-auto  Remove the LaunchAgent
+  --uninstall     Restore the app, remove the LaunchAgent and this command
+  --version       Print version
+  --help          Show this help
 
 Set WISPR_PATH to override the default install location.
 EOF
@@ -38,21 +58,128 @@ EOF
 ACTION="apply"
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --help)        usage ;;
-    --version)     echo "wispr-flow-dark-smokey $VERSION"; exit 0 ;;
-    --restore)     ACTION="restore"; shift ;;
-    --check)       ACTION="check"; shift ;;
+    --help)         usage ;;
+    --version)      echo "wispr-flow-dark-smokey $VERSION"; exit 0 ;;
+    --restore)      ACTION="restore"; shift ;;
+    --check)        ACTION="check"; shift ;;
+    --ensure)       ACTION="apply"; ENSURE=1; shift ;;
+    --enable-auto)  ACTION="enable-auto"; shift ;;
+    --disable-auto) ACTION="disable-auto"; shift ;;
+    --uninstall)    ACTION="uninstall"; shift ;;
     *) echo "Error: unknown argument '$1'"; echo; usage ;;
   esac
 done
 
-[[ -f "$ASAR" ]]              || { echo "Error: Wispr Flow not found at $ASAR"; exit 1; }
-command -v npx &>/dev/null    || { echo "Error: Node.js required (npx not found). Install: https://nodejs.org"; exit 1; }
+self_path() {
+  local p="$0"
+  [[ "$p" == */* ]] || p="$(command -v "$p" || echo "$p")"
+  cd "$(dirname "$p")" && printf '%s/%s\n' "$(pwd -P)" "$(basename "$p")"
+}
+
+launchctl_unload() {
+  launchctl bootout "gui/$(id -u)/$AGENT_LABEL" 2>/dev/null \
+    || launchctl unload "$AGENT_PLIST" 2>/dev/null || true
+}
+
+# --enable-auto / --disable-auto: no Wispr Flow or node needed for these.
+if [[ "$ACTION" == "enable-auto" ]]; then
+  SELF="$(self_path)"
+  mkdir -p "$(dirname "$AGENT_PLIST")"
+  cat > "$AGENT_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>${AGENT_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${SELF}</string>
+    <string>--ensure</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>3600</integer>
+  <key>WatchPaths</key>
+  <array><string>${ASAR}</string></array>
+  <key>StandardOutPath</key><string>${AGENT_LOG}</string>
+  <key>StandardErrorPath</key><string>${AGENT_LOG}</string>
+</dict>
+</plist>
+EOF
+  launchctl_unload
+  launchctl bootstrap "gui/$(id -u)" "$AGENT_PLIST" 2>/dev/null \
+    || launchctl load -w "$AGENT_PLIST"
+  echo "Auto re-apply enabled: $AGENT_PLIST"
+  echo "Runs '$SELF --ensure' at login, hourly, and when Wispr Flow updates."
+  exit 0
+fi
+
+if [[ "$ACTION" == "disable-auto" ]]; then
+  if [[ -f "$AGENT_PLIST" ]]; then
+    launchctl_unload
+    rm -f "$AGENT_PLIST"
+    echo "Auto re-apply disabled."
+  else
+    echo "Auto re-apply was not enabled."
+  fi
+  exit 0
+fi
+
+if [[ "$ACTION" == "uninstall" ]]; then
+  SELF="$(self_path)"
+  if [[ -f "$BACKUP" ]]; then
+    "$SELF" --restore
+  else
+    echo "No backup found — Wispr Flow left as is."
+  fi
+  "$SELF" --disable-auto
+  rm -rf "$STAMP_DIR"
+  if [[ -w "$(dirname "$SELF")" ]]; then rm -f "$SELF"; else sudo rm -f "$SELF"; fi
+  echo "Removed $SELF. Wispr Flow Dark-Smokey is uninstalled."
+  exit 0
+fi
+
+if [[ ! -f "$ASAR" ]]; then
+  [[ "$ENSURE" == "1" ]] && exit 0     # nothing to keep dark; stay quiet for launchd
+  echo "Error: Wispr Flow not found at $ASAR"; exit 1
+fi
+
+# The asar format stores HTML uncompressed, so the marker is searchable as a
+# literal string in the binary — no extract needed.
+is_applied() { LC_ALL=C grep -qa "$MARKER" "$ASAR" 2>/dev/null; }
+asar_id()    { stat -f '%m:%z' "$ASAR" 2>/dev/null || stat -c '%Y:%s' "$ASAR"; }
+
+if [[ "$ACTION" == "check" ]]; then
+  if is_applied; then echo "Dark Smokey is applied."; exit 0
+  else echo "Dark Smokey is not applied."; exit 1; fi
+fi
+
+# Already dark: --ensure is done before it needs node at all.
+[[ "$ENSURE" == "1" ]] && is_applied && exit 0
+
+if ! command -v npx &>/dev/null; then
+  [[ "$ENSURE" == "1" ]] && { echo "npx not found; cannot re-apply"; exit 0; }
+  echo "Error: Node.js required (npx not found). Install: https://nodejs.org"; exit 1
+fi
+
+# --ensure: only act when the theme is missing, and do not retry an asar that
+# already failed once (a restructured Wispr Flow would otherwise get its app
+# killed and restarted on every trigger).
+if [[ "$ENSURE" == "1" ]]; then
+  if [[ -f "$STAMP" && "$(cat "$STAMP")" == "$(asar_id)" ]]; then
+    echo "skipping: last attempt on this Wispr Flow build failed"; exit 0
+  fi
+  echo "$(date '+%Y-%m-%d %H:%M:%S') theme missing — re-applying"
+fi
 
 WORKDIR=$(mktemp -d)
 cleanup() {
+  local rc=$?
   rm -rf "$WORKDIR"
   [[ -n "$TMPFILE" && -f "$TMPFILE" ]] && rm -f "$TMPFILE"
+  if [[ "$ENSURE" == "1" && "$ACTION" == "apply" ]]; then
+    if [[ "$rc" -ne 0 ]]; then mkdir -p "$STAMP_DIR"; asar_id > "$STAMP"
+    else rm -f "$STAMP"; fi
+  fi
   if [[ "$ASAR_WRITTEN" == "1" ]]; then
     killall 'Wispr Flow' 2>/dev/null || true
     for _ in 1 2 3 4 5; do pgrep -f 'Wispr Flow' >/dev/null || break; sleep 1; done
@@ -63,18 +190,6 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
-
-# --check: detect if theme is applied — read asar bytes directly, no extract.
-# The asar format stores HTML uncompressed, so the marker is searchable as a
-# literal string in the binary.
-if [[ "$ACTION" == "check" ]]; then
-  if LC_ALL=C grep -qa "$MARKER" "$ASAR" 2>/dev/null; then
-    echo "Dark Smokey is applied."
-  else
-    echo "Dark Smokey is not applied."
-  fi
-  exit 0
-fi
 
 # Kill Wispr BEFORE touching anything
 if [[ "$APP_WAS_RUNNING" == "1" ]]; then
