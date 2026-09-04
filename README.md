@@ -24,7 +24,12 @@
 </p>
 
 <p align="center">
-  <img src="banner.png" alt="Wispr Flow Dark-Smokey" width="860">
+  <img src="banner.png" alt="Wispr Flow Dark-Smokey on macOS" width="860">
+</p>
+
+<p align="center">
+  <img src="docs/windows.png" alt="Wispr Flow Dark-Smokey on Windows 11" width="860"><br>
+  <sub>Wispr Flow 1.6 on Windows 11, themed by v1.5.0. Transcripts pixelated.</sub>
 </p>
 
 ---
