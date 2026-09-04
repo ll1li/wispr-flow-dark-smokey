@@ -28,7 +28,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/windows.png" alt="Wispr Flow Dark-Smokey on Windows 11" width="860"><br>
+  <img src="docs/windows-11.png" alt="Wispr Flow Dark-Smokey on Windows 11" width="860"><br>
   <sub>Wispr Flow 1.6 on Windows 11, themed by v1.5.0.</sub>
 </p>
 
